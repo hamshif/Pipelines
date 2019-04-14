@@ -1,0 +1,14 @@
+/target/
+.project
+.classpath
+/.settings/
+/conf/
+
+/.idea/
+*.iml
+*Stam.sc
+
+src/main/resources/accounts/
+src/main/resources/activity/
+src/main/resources/mlm.conf
+

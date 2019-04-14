@@ -1,0 +1,9 @@
+/target/
+.project
+.classpath
+/.settings/
+/conf/
+
+/.idea/
+*.iml
+/MARKETO_README.md
