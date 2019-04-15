@@ -1,10 +1,11 @@
 package com.hamshif.wielder.pipelines.fastq
 
-import com.hamshif.wielder.wild.{DatalakeArgParser, DatalakeConfig, FsUtil}
-import org.apache.hadoop.fs.{Path}
+import com.hamshif.wielder.wild.{DatalakeConfig, FsUtil}
+import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions.{col}
+import org.apache.spark.sql.functions._
 
 /**
   * @author Gideon Bar
@@ -13,21 +14,19 @@ import org.apache.spark.sql.functions.{col}
   * It then sequentially combines all paired dataframes into 1
   * and filters for duplicates outputting a cardinality account of the filtering stages.
   */
-object FastQ extends FastQUtil with DatalakeArgParser with FsUtil with FastQKeys with Logging {
+object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys with Logging {
 
   def main (args: Array[String]): Unit = {
 
     val conf = getConf(args)
+    val fastqConf = getSpecificConf(args)
 
-    FastQ.start(conf)
+    FastQ.start(conf, fastqConf)
   }
 
 
-  def start(conf: DatalakeConfig): Unit = {
+  def start(conf: DatalakeConfig, fastqConf: FastqConfig): Unit = {
 
-    //    val basePath = s"gs://gid-ram/ram"
-
-//    val basePath = "/Users/gbar/ram/short"
 
     val fastqDir = f"${conf.bucketName}"
 
@@ -42,6 +41,7 @@ object FastQ extends FastQUtil with DatalakeArgParser with FsUtil with FastQKeys
       .getOrCreate()
 
     val sc = sparkSession.sparkContext
+    sc.setLogLevel("ERROR")
     val sqlContext = sparkSession.sqlContext
 
 
@@ -109,55 +109,80 @@ object FastQ extends FastQUtil with DatalakeArgParser with FsUtil with FastQKeys
 
     println("Finished union of lanes into one dataframe before filtering")
 
-    val united = unitedTuple._1
-    val unitedLanesCardinality = united.count()
+    val datasetSize = unitedTuple._2
+    val unitedLanesDF = unitedTuple._1
 
-    println(s"All lanes dataset size is: $unitedLanesCardinality")
+//    val barcodesExtracted = unitedTuple._2
 
-    united.show(false)
+//    sanity
 
-    val filteredDuplicates = united.dropDuplicates(KEY_BARCODE, KEY_READ, KEY_SEQUENCE)
+//    val datasetSize = unitedLanesDF.count()
+//
+//    println(s"accumulated lanes sizes is: ${unitedTuple._2}")
+//    println(s"All lanes dataset size is:  $datasetSize")
 
-    val filteredDuplicatesCardinality = filteredDuplicates
-      .count()
+    unitedLanesDF.show(false)
 
-    val barcodeSeparatedCardinality = unitedTuple._2
+    val filteredDuplicatesDf = unitedLanesDF
+      .dropDuplicates(KEY_BARCODE, KEY_READ, KEY_SEQUENCE)
+      .withColumn(KEY_MIN_READ, substring(col(KEY_READ), 0, fastqConf.minBases))
+      .withColumn(KEY_ACC_QUALITY_SCORE, accumulatedReadValueScoreUdf(col(KEY_QUALITY_SCORE)))
 
-    val duplicates = barcodeSeparatedCardinality - filteredDuplicatesCardinality
 
+    val filteredDuplicates = filteredDuplicatesDf.count()
 
-    println(s"Showing filteredDuplicates after unique together KEY_BARCODE, KEY_READ, KEY_SEQUENCE duplicates were filtered")
-    println(s"$duplicates duplicates were filtered")
-//    println(s"Showing only these columns: $KEY_UNIQUE, $KEY_S_SEQUENCE, $KEY_SEQUENCE")
+    println(s"Showing filtered duplicates after unique together KEY_BARCODE, KEY_READ, KEY_SEQUENCE duplicates were filtered")
 
-    filteredDuplicates
-//      .select(col(KEY_UNIQUE), col(KEY_S_SEQUENCE), col(KEY_SEQUENCE))
+    filteredDuplicatesDf
       .show(false)
 
 
-    val filteredSuspicious = filteredDuplicates.dropDuplicates(KEY_BARCODE, KEY_READ)
+    val rdd: RDD[Row] = filteredDuplicatesDf
+      .rdd
+      .groupBy(row => row.getAs[String](KEY_MIN_READ))
+      .map(iterableTuple => {
+        iterableTuple._2.reduce(higherTranscriptionQuality)
+      })
 
-    val filteredSuspiciousCardinality = filteredSuspicious.count()
+    val filteredSimilarReadsDf = sqlContext.createDataFrame(rdd, filteredDuplicatesDf.schema)
 
-    val suspiciousDuplicatesCardinality = filteredDuplicatesCardinality - filteredSuspiciousCardinality
+    val filteredSimilarReads = filteredSimilarReadsDf.count()
 
-    println(s"Showing filteredSuspicious after unique together KEY_BARCODE, KEY_READ duplicates were filtered")
-    println(s"$suspiciousDuplicatesCardinality suspicious entries were filtered")
-//    println(s"Showing only these columns: $KEY_UNIQUE, $KEY_S_SEQUENCE, $KEY_SEQUENCE")
-    filteredSuspicious
-//      .select(col(KEY_UNIQUE), col(KEY_BARCODE), col(KEY_READ))
-      .show(false)
+    filteredSimilarReadsDf.show(false)
 
-    println(s"unitedLanesCardinality:           $unitedLanesCardinality")
+// TODO find out if it's easy with df
 
-    println(s"filteredDuplicates:               $filteredDuplicatesCardinality")
+//    val filteredSimilar = filteredDuplicates
+//      .groupBy(KEY_MIN_READ)
+//      .agg(
+//        max(KEY_ACC_QUALITY_SCORE) as KEY_ACC_QUALITY_SCORE
+//      )
+////      .agg(Map(
+////        KEY_ACC_QUALITY_SCORE -> "max"
+////      ))
+//
+//    val v = filteredSimilar.count()
+//
+//    println(s"maxed: $v")
+//
+//    filteredSimilar.show(false)
 
-    println(s"suspiciousDuplicatesCardinality:  $suspiciousDuplicatesCardinality")
+    println(s"\nShowing filtered dataset")
 
-    println(s"After all filtering:              $filteredSuspiciousCardinality")
+    filteredSimilarReadsDf
+      .show(50, false)
 
+    println(s"Dataset size:                  $datasetSize")
+    println(s"After filtering duplicates:    $filteredDuplicates")
+    println(s"After filtering similar:       $filteredSimilarReads\n")
 
-    toFastq(filteredSuspicious, sinkDir, sampleName, fs, sc)
+    println(s"Filtered Duplicates:           ${datasetSize - filteredDuplicates}")
+    println(s"Filtered Similar:              ${filteredDuplicates - filteredSimilarReads}\n")
+    println(s"Total Filtered:                ${datasetSize - filteredSimilarReads}\n")
+
+    println(s"Filtered dataset:              $filteredSimilarReads\n")
+
+    toFastq(filteredSimilarReadsDf, sinkDir, sampleName, fs, sc)
   }
 
 }

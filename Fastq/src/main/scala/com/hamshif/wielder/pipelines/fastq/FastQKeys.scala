@@ -21,6 +21,8 @@ trait FastQKeys {
 
   val KEY_BARCODE = "barcode"
   val KEY_READ = "read"
+  val KEY_MIN_READ = "min_read"
+  val KEY_ACC_QUALITY_SCORE = s"accumulated_quality"
 
   val SEQUENCE_DF_FIELDS = Array[String](
     KEY_SEQUENCE_IDENTIFIER,
@@ -35,4 +37,14 @@ trait FastQKeys {
     KEY_S_QUALITY_SCORE_IDENTIFIER,
     KEY_S_QUALITY_SCORE
   )
+
+  val DERIVED = Array[String](
+    KEY_UNIQUE,
+    KEY_BARCODE,
+    KEY_READ,
+    KEY_MIN_READ,
+    KEY_ACC_QUALITY_SCORE
+  )
+
+  val COMBINED = BARCODE_DF_FIELDS ++ SEQUENCE_DF_FIELDS ++ DERIVED
 }

@@ -142,15 +142,15 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
         .select(KEY_SEQUENCE_IDENTIFIER, KEY_SEQUENCE, KEY_QUALITY_SCORE_IDENTIFIER, KEY_QUALITY_SCORE)
         .withColumn(
           KEY_FASTQ,
-          toFastsqStringUdf(col(KEY_SEQUENCE_IDENTIFIER), col(KEY_SEQUENCE), col(KEY_QUALITY_SCORE_IDENTIFIER), col(KEY_QUALITY_SCORE))
+          toFastqStringUdf(col(KEY_SEQUENCE_IDENTIFIER), col(KEY_SEQUENCE), col(KEY_QUALITY_SCORE_IDENTIFIER), col(KEY_QUALITY_SCORE))
         )
       .select(KEY_FASTQ)
 
-//    fastsqFields
+//    fastqFields
 //      .show(1,false)
 //
 //
-//    fastsqFields
+//    fastqFields
       .coalesce(1)
       .write
       .mode(SaveMode.Overwrite)
@@ -167,7 +167,7 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
   }
 
 
-  val toFastsqStringUdf = udf(toFastqString)
+  val toFastqStringUdf = udf(toFastqString)
 
   def toFastqString: ((String, String, String, String) => String) = {
 
@@ -176,4 +176,38 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     }
   }
 
+
+  val accumulatedReadValueScoreUdf = udf(accumulatedReadValueScore)
+
+  def accumulatedReadValueScore: (String => Long) = {
+
+    s => {
+      val aa = s.foldLeft((IndexedSeq[Byte](), 0L))((acc, c) => {
+
+        val l = c.toByte
+
+//        print(s"${l.toLong} ")
+
+        (acc._1 :+ l, acc._2 + l.toLong)
+      })
+
+//      println("")
+
+      aa._2
+    }
+  }
+
+
+  def higherTranscriptionQuality(r1: Row, r2: Row): Row = {
+
+    val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
+    val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
+
+    score1 match {
+      case s if s >= score2 =>
+        r1
+      case _ =>
+        r2
+    }
+  }
 }
