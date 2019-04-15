@@ -197,8 +197,13 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     }
   }
 
-
-  def higherTranscriptionQuality(r1: Row, r2: Row): Row = {
+  /**
+    * Chooses the row with higher transcription quality
+    * @param r1 Dataframe row
+    * @param r2
+    * @return The row with higher transcription quality
+    */
+  def byHigherTranscriptionQuality(r1: Row, r2: Row): Row = {
 
     val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
     val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)

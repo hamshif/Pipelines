@@ -12,7 +12,7 @@ import org.apache.spark.sql.functions._
   * An ETL for ingesting and filtering FASTQ format genetic sequencing text files.
   * As of now it pairs fastq files to Read 1 and Read 2, "Joins" them into 1 dataframe.
   * It then sequentially combines all paired dataframes into 1
-  * and filters for duplicates outputting a cardinality account of the filtering stages.
+  * and filters for duplicates, outputting a cardinal account of the filtering stages.
   */
 object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys with Logging {
 
@@ -141,7 +141,7 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       .rdd
       .groupBy(row => row.getAs[String](KEY_MIN_READ))
       .map(iterableTuple => {
-        iterableTuple._2.reduce(higherTranscriptionQuality)
+        iterableTuple._2.reduce(byHigherTranscriptionQuality)
       })
 
     val filteredSimilarReadsDf = sqlContext.createDataFrame(rdd, filteredDuplicatesDf.schema)
@@ -149,23 +149,6 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
     val filteredSimilarReads = filteredSimilarReadsDf.count()
 
     filteredSimilarReadsDf.show(false)
-
-// TODO find out if it's easy with df
-
-//    val filteredSimilar = filteredDuplicates
-//      .groupBy(KEY_MIN_READ)
-//      .agg(
-//        max(KEY_ACC_QUALITY_SCORE) as KEY_ACC_QUALITY_SCORE
-//      )
-////      .agg(Map(
-////        KEY_ACC_QUALITY_SCORE -> "max"
-////      ))
-//
-//    val v = filteredSimilar.count()
-//
-//    println(s"maxed: $v")
-//
-//    filteredSimilar.show(false)
 
     println(s"\nShowing filtered dataset")
 
