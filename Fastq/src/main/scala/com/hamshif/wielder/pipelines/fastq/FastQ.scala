@@ -102,6 +102,9 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
       val j = l1._1.union(l2._1)
 
+      l1._1.unpersist(true)
+      l2._1.unpersist(true)
+
       j.show(false)
 
       (j, l1._2 + l2._2)
@@ -128,6 +131,7 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       .withColumn(KEY_MIN_READ, substring(col(KEY_READ), 0, fastqConf.minBases))
       .withColumn(KEY_ACC_QUALITY_SCORE, accumulatedReadValueScoreUdf(col(KEY_QUALITY_SCORE)))
 
+    unitedLanesDF.unpersist(true)
 
     val filteredDuplicates = filteredDuplicatesDf.count()
 
