@@ -6,6 +6,7 @@ package com.hamshif.wielder.pipelines.fastq
   * @param minFidelityScore Minimum transcription fidelity score for read 2 (R2) not to be filtered
   */
 case class FastqConfig(
-                      minBases: Int = 5,
-                      minFidelityScore: Int = 1000
+                        debugVerbose: Boolean = false,
+                        minBases: Int = 5,
+                        minFidelityScore: Int = 1000
                      )

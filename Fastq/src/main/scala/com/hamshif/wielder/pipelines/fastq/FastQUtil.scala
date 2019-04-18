@@ -6,7 +6,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.mllib.rdd.RDDFunctions._
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions.{col, udf}
+import org.apache.spark.sql.functions._
 
 /**
   * @author Gideon Bar
@@ -117,16 +117,27 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     }
   }
 
+  /**
+    * Joins read1 and read2 fastq dataframes with the following extracted columns:
+    * 1. Barcode Read UMI Extraction from read1.
+    * 2. The first {minBases} extracted from read2 (can be used to determine if reads are similar)
+    * 3. Accumulated read2 transcription fidelity quality score.
+    * @param read1Df
+    * @param read2Df
+    * @param minBases
+    * @return joind enriched dataframe
+    */
+  def joinFastqReadsWithFilteringExtractions(read1Df: DataFrame, read2Df: DataFrame, minBases: Int ): DataFrame = {
 
-  def joinWithBarcodeReadExtraction(raw1: DataFrame, raw2: DataFrame): DataFrame = {
-
-    raw1
-      .join(raw2, raw1(KEY_S_UNIQUE) === raw2(KEY_UNIQUE),"inner")
+    read1Df
+      .join(read2Df, read1Df(KEY_S_UNIQUE) === read2Df(KEY_UNIQUE),"inner")
       .drop(col(KEY_S_UNIQUE))
       .withColumn("_tmp", separateBarcodeUdf(col(KEY_S_SEQUENCE)))
       .withColumn(KEY_BARCODE, col("_tmp")(1))
       .withColumn(KEY_READ, col("_tmp")(0))
       .drop(col("_tmp"))
+      .withColumn(KEY_MIN_READ, substring(col(KEY_SEQUENCE), 0, minBases))
+      .withColumn(KEY_ACC_QUALITY_SCORE, accumulatedReadValueScoreUdf(col(KEY_QUALITY_SCORE)))
   }
 
 
@@ -138,8 +149,11 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
 
     println(s"targetPath: $targetPath")
 
-    val fastsqFields = unitedReads
-        .select(KEY_SEQUENCE_IDENTIFIER, KEY_SEQUENCE, KEY_QUALITY_SCORE_IDENTIFIER, KEY_QUALITY_SCORE)
+//    TODO add options for writing to multiple files by partitioning
+//    val fastqFields = unitedReads
+    unitedReads
+
+      .select(KEY_SEQUENCE_IDENTIFIER, KEY_SEQUENCE, KEY_QUALITY_SCORE_IDENTIFIER, KEY_QUALITY_SCORE)
         .withColumn(
           KEY_FASTQ,
           toFastqStringUdf(col(KEY_SEQUENCE_IDENTIFIER), col(KEY_SEQUENCE), col(KEY_QUALITY_SCORE_IDENTIFIER), col(KEY_QUALITY_SCORE))
@@ -215,4 +229,6 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
         r2
     }
   }
+
+
 }

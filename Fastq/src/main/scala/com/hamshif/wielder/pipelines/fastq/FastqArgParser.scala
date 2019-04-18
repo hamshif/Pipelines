@@ -21,6 +21,11 @@ trait FastqArgParser extends DatalakeArgParser {
 
     head("scopt", "3.x")
 
+    opt[Boolean]("verbose")
+      .action((x, c) => c.copy(debugVerbose = x))
+      .text("Liberally use dataframe show and count for developing on small data sets. " +
+        "Defaults to false to minimize cache and runtime")
+
     opt[Int]("bases")
       .action((x, c) => c.copy(minBases = x))
       .text("Minimum bases for read 2 (R2) to be considered similar. " +

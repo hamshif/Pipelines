@@ -14,18 +14,19 @@ import org.apache.spark.sql.functions._
   * It then sequentially combines all paired dataframes into 1
   * and filters for duplicates, outputting a cardinal account of the filtering stages.
   */
-object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys with Logging {
+object FastQ1 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys with Logging {
 
   def main (args: Array[String]): Unit = {
 
     val conf = getConf(args)
     val fastqConf = getSpecificConf(args)
 
-    FastQ.start(conf, fastqConf)
+    FastQ1.start(conf, fastqConf)
   }
 
 
   def start(conf: DatalakeConfig, fastqConf: FastqConfig): Unit = {
+
 
     val fastqDir = f"${conf.bucketName}"
 
@@ -40,10 +41,17 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       .getOrCreate()
 
     val sc = sparkSession.sparkContext
-
     sc.setLogLevel("ERROR")
-
     val sqlContext = sparkSession.sqlContext
+
+
+//    val flowers =
+//      sc.parallelize(List(11,12,13,24,25, 26, 35,36,37, 24,15,16),4)
+//
+//    val flowersandpickers = flowers.aggregate((0,0)) (
+//      (acc, value) => (acc._1 + value, acc._2 +1),
+//      (acc1, acc2) => (acc1._1 + acc2._1, acc1._2 + acc2._2)
+//    )
 
 
     val fs = new Path(basePath).getFileSystem(sc.hadoopConfiguration)
@@ -77,6 +85,8 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
         rawBarcodeDataCardinality = read1Df.count()
         rawSequenceTailDataCardinality = read2Df.count()
 
+        //
+        ////
         //    read1Df.printSchema()
         //
         //    read2Df.printSchema()
@@ -141,32 +151,64 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
     }
 
 
-    val rdd1 = filteredDuplicatesDf
+    val v = filteredDuplicatesDf
+      .groupBy(col(KEY_MIN_READ))
+      .agg(max(KEY_ACC_QUALITY_SCORE).as("max"))
+        .withColumnRenamed(KEY_MIN_READ, "extra")
+
+
+    v.show(50,false)
+
+    val cc = v.count()
+
+    println(s"filtered  $cc")
+
+
+    val vv = v.join(filteredDuplicatesDf,
+      v("max") === filteredDuplicatesDf(KEY_ACC_QUALITY_SCORE) &&
+        v("extra") === filteredDuplicatesDf(KEY_MIN_READ),
+      "inner")
+//        .drop("max")
+
+//    vv.printSchema()
+
+    val c = vv.count()
+
+    println(s"joined filtered with origin $c")
+
+    vv.show(50, false)
+    println("")
+
+//      .foreachPartition(rows => {
+//        val v = rows
+//          .foldLeft(Map[String, Row]())((acc, row) => {
+//
+//            val s = row.getAs[String](KEY_MIN_READ)
+//            val ss = acc.getOrElse(s, row)
+//
+//            acc + (s -> ss)
+//          })
+//          .map(a => a._2)
+//
+//      })
+
+
+
+
+//    println(s.count())
+//
+//    s.printSchema()
+//
+//    s.show(false)
+
+    val rdd: RDD[Row] = filteredDuplicatesDf
+//      .repartition(col(KEY_MIN_READ))
       .rdd
       .groupBy(row => row.getAs[String](KEY_MIN_READ))
-
-
-
-
-//    val c = rdd1.count()
-//
-//    println(s"number of groups $c")
-//
-//    rdd1.foreach(it => {
-//      println(s"\nkey: ${it._1}")
-//
-//      it._2.map(row => {
-//
-//        val j = row.getAs[String](KEY_MIN_READ)
-//        println(s" value: ${j}")
-//      })
-//    })
-
-    val rdd: RDD[Row] = rdd1
+//      .repartition(8)
       .map(iterableTuple => {
         iterableTuple._2.reduce(byHigherTranscriptionQuality)
       })
-
 
     val filteredSimilarReadsDf = sqlContext.createDataFrame(rdd, filteredDuplicatesDf.schema)
 
@@ -186,8 +228,6 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
     println(s"Total Filtered:                ${datasetSize - filteredSimilarReads}\n")
 
     println(s"Filtered dataset:              $filteredSimilarReads\n")
-
-    val fl = filteredSimilarReadsDf
 
     toFastq(filteredSimilarReadsDf, sinkDir, sampleName, fs, sc)
   }
