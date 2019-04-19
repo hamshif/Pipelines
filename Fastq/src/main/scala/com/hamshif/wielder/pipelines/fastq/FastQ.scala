@@ -140,27 +140,33 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       filteredDuplicatesDf.show(false)
     }
 
+    filteredDuplicatesDf.show(50, false)
 
     val rdd1 = filteredDuplicatesDf
       .rdd
       .groupBy(row => row.getAs[String](KEY_MIN_READ))
 
 
+    if(fastqConf.debugVerbose){
+
+      val c = rdd1.count()
+
+      println(s"number of groups $c")
+
+      rdd1.take(50).foreach(it => {
 
 
-//    val c = rdd1.count()
-//
-//    println(s"number of groups $c")
-//
-//    rdd1.foreach(it => {
-//      println(s"\nkey: ${it._1}")
-//
-//      it._2.map(row => {
-//
-//        val j = row.getAs[String](KEY_MIN_READ)
-//        println(s" value: ${j}")
-//      })
-//    })
+        val key = it._1
+        println(s"\nkey: ${key}")
+
+        it._2.foreach(row => {
+
+          val j = row.getAs[String](KEY_MIN_READ)
+          println(s" value: ${j}")
+        })
+      })
+    }
+
 
     val rdd: RDD[Row] = rdd1
       .map(iterableTuple => {
@@ -187,7 +193,6 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     println(s"Filtered dataset:              $filteredSimilarReads\n")
 
-    val fl = filteredSimilarReadsDf
 
     toFastq(filteredSimilarReadsDf, sinkDir, sampleName, fs, sc)
   }

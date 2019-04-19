@@ -219,6 +219,11 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     */
   def byHigherTranscriptionQuality(r1: Row, r2: Row): Row = {
 
+//    val j1 = r1.getAs[String](KEY_MIN_READ)
+//    val j2 = r2.getAs[String](KEY_MIN_READ)
+//
+////    println(s"value1: ${j1} value2: ${j2}")
+
     val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
     val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
 
