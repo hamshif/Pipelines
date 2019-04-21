@@ -11,8 +11,9 @@ import org.apache.spark.sql.functions._
   * @author Gideon Bar
   * An ETL for ingesting and filtering FASTQ format genetic sequencing text files.
   * As of now it pairs fastq files to Read 1 and Read 2, "Joins" them into 1 dataframe.
-  * It then sequentially combines all paired dataframes into 1
-  * and filters for duplicates, outputting a cardinal account of the filtering stages.
+  * It then sequentially combines all paired dataframes into 1 dataframe.
+  * The ETL then filters for duplicates and similar read2 entries, outputting a cardinal account of the filtering stages.
+  * Each filtering stage is done sequentially to preserve the filtering account disregarding potential optimizations of combining filters
   */
 object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys with Logging {
 
@@ -84,6 +85,9 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
       val joinedWithBarcode = joinFastqReadsWithFilteringExtractions(read1Df, read2Df, fastqConf.minBases)
 
+      read1Df.unpersist(true)
+      read2Df.unpersist(true)
+
       val barcodeSeparatedCardinality = joinedWithBarcode.count()
 
       println(s"Joined data from\n$t1\n$t2\n")
@@ -109,10 +113,12 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
       val j = l1.union(l2)
 
+      l2.unpersist(true)
+
       if(fastqConf.debugVerbose){
         j.show(false)
       }
-      
+
       j
     })
 
@@ -140,12 +146,13 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       filteredDuplicatesDf.show(false)
     }
 
-    filteredDuplicatesDf.show(50, false)
+    val filteredDuplicatesSchema = filteredDuplicatesDf.schema
 
     val rdd1 = filteredDuplicatesDf
       .rdd
       .groupBy(row => row.getAs[String](KEY_MIN_READ))
 
+    filteredDuplicatesDf.unpersist(true)
 
     if(fastqConf.debugVerbose){
 
@@ -173,15 +180,22 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
         iterableTuple._2.reduce(byHigherTranscriptionQuality)
       })
 
+    rdd1.unpersist(true)
 
-    val filteredSimilarReadsDf = sqlContext.createDataFrame(rdd, filteredDuplicatesDf.schema)
+
+    val filteredSimilarReadsDf = sqlContext.createDataFrame(rdd, filteredDuplicatesSchema)
+
+    rdd.unpersist(true)
 
     val filteredSimilarReads = filteredSimilarReadsDf.count()
 
     println(s"\nShowing filtered dataset")
 
-    filteredSimilarReadsDf
-      .show(50, false)
+    if(fastqConf.debugVerbose) {
+
+      filteredSimilarReadsDf
+        .show(50, false)
+    }
 
     println(s"Dataset size:                  $datasetSize")
     println(s"After filtering duplicates:    $filteredDuplicates")
@@ -193,6 +207,7 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     println(s"Filtered dataset:              $filteredSimilarReads\n")
 
+    filteredSimilarReadsDf.persist()
 
     toFastq(filteredSimilarReadsDf, sinkDir, sampleName, fs, sc)
   }

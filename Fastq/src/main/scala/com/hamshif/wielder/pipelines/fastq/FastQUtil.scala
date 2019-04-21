@@ -1,12 +1,13 @@
 package com.hamshif.wielder.pipelines.fastq
 
-import com.hamshif.wielder.wild.{FsUtil}
-import org.apache.hadoop.fs.{FileStatus, FileSystem, Path}
+import com.hamshif.wielder.wild.FsUtil
+import org.apache.hadoop.fs.{FileStatus, FileSystem, FileUtil, Path}
 import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.mllib.rdd.RDDFunctions._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
+import org.apache.hadoop.conf.Configuration
 
 /**
   * @author Gideon Bar
@@ -141,17 +142,13 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
   }
 
 
-  def toFastq(unitedReads: DataFrame, sinkDir: String, sampleName: String, fs: FileSystem, sc: SparkContext): Unit = {
+  def toFastq(fastqDf: DataFrame, sinkDir: String, sampleName: String, fs: FileSystem, sc: SparkContext): Unit = {
 
     println(s"Sink directory:  $sinkDir")
 
-    val targetPath = s"$sinkDir/$sampleName.$KEY_FASTQ"
+    val partsPath = s"$sinkDir/parts"
 
-    println(s"targetPath: $targetPath")
-
-//    TODO add options for writing to multiple files by partitioning
-//    val fastqFields = unitedReads
-    unitedReads
+    fastqDf
 
       .select(KEY_SEQUENCE_IDENTIFIER, KEY_SEQUENCE, KEY_QUALITY_SCORE_IDENTIFIER, KEY_QUALITY_SCORE)
         .withColumn(
@@ -159,27 +156,39 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
           toFastqStringUdf(col(KEY_SEQUENCE_IDENTIFIER), col(KEY_SEQUENCE), col(KEY_QUALITY_SCORE_IDENTIFIER), col(KEY_QUALITY_SCORE))
         )
       .select(KEY_FASTQ)
-
-//    fastqFields
-//      .show(1,false)
-//
-//
-//    fastqFields
-      .coalesce(1)
       .write
       .mode(SaveMode.Overwrite)
-//      .partitionBy(KEY_FASTQ)
       .format("text")
-      .save(sinkDir)
+      .save(partsPath)
 
-    val newPath = new Path(targetPath)
-    fs.delete(newPath, true)
+//    gathering files
+//    val oldPath = fs.globStatus(new Path(s"$sinkDir/part*"))(0).getPath()
+//    val newPath = new Path(targetPath)
+//    just making sure no old files exist
+//    fs.delete(newPath, true)
+//    fs.rename(oldPath, newPath)
 
-    val oldPath = fs.globStatus(new Path(s"$sinkDir/part*"))(0).getPath()
+    val mergedPath = s"$sinkDir/merged/$sampleName.$KEY_FASTQ"
 
-    fs.rename(oldPath, newPath)
+    println(s"Wrote files per partitions\nGoing to merge them to:\n$mergedPath")
+
+    merge(fs, partsPath, mergedPath)
+
+    fastqDf.unpersist()
   }
 
+  def merge(fs: FileSystem, srcPath: String, dstPath: String): Unit =  {
+    val hadoopConfig = fs.getConf()
+    FileUtil.copyMerge(fs, new Path(srcPath), fs, new Path(dstPath), false, hadoopConfig, null)
+    // the "true" setting deletes the source files once they are merged into the new output
+  }
+
+  def merge(srcPath: String, dstPath: String): Unit =  {
+    val hadoopConfig = new Configuration()
+    val hdfs = FileSystem.get(hadoopConfig)
+    FileUtil.copyMerge(hdfs, new Path(srcPath), hdfs, new Path(dstPath), true, hadoopConfig, null)
+    // the "true" setting deletes the source files once they are merged into the new output
+  }
 
   val toFastqStringUdf = udf(toFastqString)
 
