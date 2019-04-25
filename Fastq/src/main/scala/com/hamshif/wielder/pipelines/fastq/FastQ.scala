@@ -105,8 +105,7 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       joinedWithBarcode :: acc
     })
 
-    println("Finished creating read1 read2 pairs\n")
-
+    println(s"Finished creating read1 read2 pairs and extracting filter columns in\n")
     println("Starting union of lanes into one dataframe before filtering\n")
 
     val unitedLanesDF = lanes.reduce((l1, l2) => {
@@ -137,7 +136,9 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     val filteredDuplicates = filteredDuplicatesDf.count()
 
-    println(s"Filtered Duplicates:           ${datasetSize - filteredDuplicates}")
+    println(s"Finished filtering exact duplicate filtering and counting them\n")
+
+    println(s"Without Duplicates dataset size is:           ${filteredDuplicates}")
 
     if(fastqConf.debugVerbose){
 
@@ -182,17 +183,18 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     rdd1.unpersist(true)
 
-
     val filteredSimilarReadsDf = sqlContext.createDataFrame(rdd, filteredDuplicatesSchema)
 
     rdd.unpersist(true)
 
     val filteredSimilarReads = filteredSimilarReadsDf.count()
 
-    println(s"\nShowing filtered dataset")
+    println(s"Finished filtering similar reads and counting them.\n")
+
 
     if(fastqConf.debugVerbose) {
 
+      println(s"\nShowing filtered dataset")
       filteredSimilarReadsDf
         .show(50, false)
     }
@@ -207,7 +209,7 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     println(s"Filtered dataset:              $filteredSimilarReads\n")
 
-    filteredSimilarReadsDf.persist()
+//    filteredSimilarReadsDf.persist()
 
     toFastq(filteredSimilarReadsDf, sinkDir, sampleName, fs, sc)
   }

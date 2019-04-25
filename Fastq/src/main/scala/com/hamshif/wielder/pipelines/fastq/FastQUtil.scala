@@ -7,7 +7,6 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.mllib.rdd.RDDFunctions._
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
-import org.apache.hadoop.conf.Configuration
 
 /**
   * @author Gideon Bar
@@ -147,6 +146,7 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     println(s"Sink directory:  $sinkDir")
 
     val partsPath = s"$sinkDir/parts"
+    println(s"Writing partitioned files to:  $partsPath")
 
     fastqDf
 
@@ -161,34 +161,15 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
       .format("text")
       .save(partsPath)
 
-//    gathering files
-//    val oldPath = fs.globStatus(new Path(s"$sinkDir/part*"))(0).getPath()
-//    val newPath = new Path(targetPath)
-//    just making sure no old files exist
-//    fs.delete(newPath, true)
-//    fs.rename(oldPath, newPath)
+    val mergedFullPath = s"$sinkDir/merged/$sampleName.$KEY_FASTQ"
 
-    val mergedPath = s"$sinkDir/merged/$sampleName.$KEY_FASTQ"
+    println(s"Wrote files per partitions\nGoing to merge them to:\n$mergedFullPath")
 
-    println(s"Wrote files per partitions\nGoing to merge them to:\n$mergedPath")
-
-    merge(fs, partsPath, mergedPath)
-
-    fastqDf.unpersist()
+    val mergedPath = new Path(mergedFullPath)
+    fs.delete(mergedPath, true)
+    FileUtil.copyMerge(fs, new Path(partsPath), fs, mergedPath, false, fs.getConf, null)
   }
 
-  def merge(fs: FileSystem, srcPath: String, dstPath: String): Unit =  {
-    val hadoopConfig = fs.getConf()
-    FileUtil.copyMerge(fs, new Path(srcPath), fs, new Path(dstPath), false, hadoopConfig, null)
-    // the "true" setting deletes the source files once they are merged into the new output
-  }
-
-  def merge(srcPath: String, dstPath: String): Unit =  {
-    val hadoopConfig = new Configuration()
-    val hdfs = FileSystem.get(hadoopConfig)
-    FileUtil.copyMerge(hdfs, new Path(srcPath), hdfs, new Path(dstPath), true, hadoopConfig, null)
-    // the "true" setting deletes the source files once they are merged into the new output
-  }
 
   val toFastqStringUdf = udf(toFastqString)
 
@@ -243,6 +224,5 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
         r2
     }
   }
-
 
 }
