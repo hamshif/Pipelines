@@ -19,10 +19,10 @@ trait FastQKeys {
   val KEY_S_QUALITY_SCORE = s"$KEY_SHORT$KEY_QUALITY_SCORE"
   val KEY_S_UNIQUE = s"$KEY_SHORT$KEY_UNIQUE"
 
-//  KEY_UMI
   val KEY_UMI = "umi"
   val KEY_BARCODE = "barcode"
   val KEY_MIN_READ = "min_read"
+  val KEY_MIN_READ_BARCODE = "min_read_barcode"
   val KEY_ACC_QUALITY_SCORE = s"accumulated_quality"
 
   val KEY_FILTERED_DUPLICATES = "filtered_duplicates"

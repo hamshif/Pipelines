@@ -138,6 +138,7 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
       .withColumn(KEY_BARCODE, col("_tmp")(0))
       .drop(col("_tmp"))
       .withColumn(KEY_MIN_READ, substring(col(KEY_SEQUENCE), 0, minBases))
+      .withColumn(KEY_MIN_READ_BARCODE, concat(col(KEY_MIN_READ), lit("_"), col(KEY_S_SEQUENCE)))
       .withColumn(KEY_ACC_QUALITY_SCORE, accumulatedReadValueScoreUdf(col(KEY_QUALITY_SCORE)))
       .withColumn(KEY_FILTERED_DUPLICATES, lit(0L))
       .withColumn(KEY_FILTERED_SIMILAR, lit(0L))
@@ -229,11 +230,12 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
         r2
     }
 
+    val acc1 = r1.getAs[Long](KEY_FILTERED_SIMILAR)
+    val acc2 = r2.getAs[Long](KEY_FILTERED_SIMILAR)
 
+    val gg = acc1 + acc2 + 1L
 
-    val gg = r3.getAs[Long](KEY_FILTERED_SIMILAR) + 1L
-
-    val g = r3.toSeq.updated(14, gg).toArray
+    val g = r3.toSeq.updated(15, gg).toArray
 //    val r = Row.fromSeq(g)
     val rr = new GenericRowWithSchema(g, r1.schema)
 

@@ -129,7 +129,7 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
     println(s"accumulated lanes size is: ${datasetSize}")
 
     if(fastqConf.debugVerbose){
-      unitedLanesDF.show(false)
+      unitedLanesDF.show(50,false)
     }
 
 //    TODO consider moving this into a folding filter after the group by
@@ -151,6 +151,7 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     val filteredDuplicatesSchema = filteredDuplicatesDf.schema
 
+//TODO see if this is a more promising direction for group by
 
 //    val v = filteredDuplicatesDf.columns
 //      .map(c => col(c))
@@ -168,16 +169,10 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 //      .show(false)
 
 
-
-
-
     val rdd1 = filteredDuplicatesDf
       .rdd
       .groupBy(row => {
-
-//        val s = row.getAs[String](KEY_S_SEQUENCE) + row.getAs[String](KEY_MIN_READ)
-
-        row.getAs[String](KEY_MIN_READ)
+        row.getAs[String](KEY_MIN_READ_BARCODE)
       })
 
     filteredDuplicatesDf.unpersist(true)
@@ -196,7 +191,7 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
         it._2.foreach(row => {
 
-          val j = row.getAs[String](KEY_MIN_READ)
+          val j = row.getAs[String](KEY_MIN_READ_BARCODE)
           println(s" value: ${j}")
         })
       })
