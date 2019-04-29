@@ -6,6 +6,7 @@ import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
+import org.apache.spark.sql.functions.struct
 
 /**
   * @author Gideon Bar
@@ -131,8 +132,9 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       unitedLanesDF.show(false)
     }
 
+//    TODO consider moving this into a folding filter after the group by
     val filteredDuplicatesDf = unitedLanesDF
-      .dropDuplicates(KEY_BARCODE, KEY_READ, KEY_SEQUENCE)
+      .dropDuplicates(KEY_UMI, KEY_BARCODE, KEY_SEQUENCE)
 
     val filteredDuplicates = filteredDuplicatesDf.count()
 
@@ -149,9 +151,34 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     val filteredDuplicatesSchema = filteredDuplicatesDf.schema
 
+
+//    val v = filteredDuplicatesDf.columns
+//      .map(c => col(c))
+//
+//    val df = filteredDuplicatesDf
+//      .withColumn("f", struct(v:_*))
+//
+////      df.show(false)
+////
+////
+////    df
+////      .withColumn("f", struct(v:_*))
+//      .groupBy(KEY_MIN_READ)
+//      .agg(collect_list("f"))
+//      .show(false)
+
+
+
+
+
     val rdd1 = filteredDuplicatesDf
       .rdd
-      .groupBy(row => row.getAs[String](KEY_MIN_READ))
+      .groupBy(row => {
+
+//        val s = row.getAs[String](KEY_S_SEQUENCE) + row.getAs[String](KEY_MIN_READ)
+
+        row.getAs[String](KEY_MIN_READ)
+      })
 
     filteredDuplicatesDf.unpersist(true)
 

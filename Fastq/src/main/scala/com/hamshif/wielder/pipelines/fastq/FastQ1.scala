@@ -137,7 +137,7 @@ object FastQ1 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys w
     }
 
     val filteredDuplicatesDf = unitedLanesDF
-      .dropDuplicates(KEY_BARCODE, KEY_READ, KEY_SEQUENCE)
+      .dropDuplicates(KEY_UMI, KEY_BARCODE, KEY_SEQUENCE)
 
     val filteredDuplicates = filteredDuplicatesDf.count()
 

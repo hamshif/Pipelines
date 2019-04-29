@@ -6,6 +6,7 @@ import org.apache.spark.SparkContext
 import org.apache.spark.internal.Logging
 import org.apache.spark.mllib.rdd.RDDFunctions._
 import org.apache.spark.sql._
+import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.apache.spark.sql.functions._
 
 /**
@@ -133,11 +134,13 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
       .join(read2Df, read1Df(KEY_S_UNIQUE) === read2Df(KEY_UNIQUE),"inner")
       .drop(col(KEY_S_UNIQUE))
       .withColumn("_tmp", separateBarcodeUdf(col(KEY_S_SEQUENCE)))
-      .withColumn(KEY_BARCODE, col("_tmp")(1))
-      .withColumn(KEY_READ, col("_tmp")(0))
+      .withColumn(KEY_UMI, col("_tmp")(1))
+      .withColumn(KEY_BARCODE, col("_tmp")(0))
       .drop(col("_tmp"))
       .withColumn(KEY_MIN_READ, substring(col(KEY_SEQUENCE), 0, minBases))
       .withColumn(KEY_ACC_QUALITY_SCORE, accumulatedReadValueScoreUdf(col(KEY_QUALITY_SCORE)))
+      .withColumn(KEY_FILTERED_DUPLICATES, lit(0L))
+      .withColumn(KEY_FILTERED_SIMILAR, lit(0L))
   }
 
 
@@ -209,6 +212,7 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     */
   def byHigherTranscriptionQuality(r1: Row, r2: Row): Row = {
 
+
 //    val j1 = r1.getAs[String](KEY_MIN_READ)
 //    val j2 = r2.getAs[String](KEY_MIN_READ)
 //
@@ -217,11 +221,48 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
     val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
 
-    score1 match {
+    val r3 = score1 match {
       case s if s >= score2 =>
+
         r1
       case _ =>
         r2
+    }
+
+
+
+    val gg = r3.getAs[Long](KEY_FILTERED_SIMILAR) + 1L
+
+    val g = r3.toSeq.updated(14, gg).toArray
+//    val r = Row.fromSeq(g)
+    val rr = new GenericRowWithSchema(g, r1.schema)
+
+//    val d = rr.getAs[Long](KEY_ACC_QUALITY_SCORE)
+    //    val v = RowFactory.create(g)
+
+//    val m = r3.getValuesMap[Any](r1.schema.fieldNames) + (KEY_FILTERED_SIMILAR -> g)
+//
+//    val r = RowFactory.create(m)
+
+    rr
+  }
+
+  def gg: ((Row, Row) => Row) = {
+
+    (r1, r2) => {
+      val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
+      val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
+
+
+      val g = r1.toSeq
+
+      score1 match {
+        case s if s >= score2 =>
+
+          r1
+        case _ =>
+          r2
+      }
     }
   }
 

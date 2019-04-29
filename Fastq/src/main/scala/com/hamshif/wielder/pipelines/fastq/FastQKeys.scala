@@ -19,10 +19,14 @@ trait FastQKeys {
   val KEY_S_QUALITY_SCORE = s"$KEY_SHORT$KEY_QUALITY_SCORE"
   val KEY_S_UNIQUE = s"$KEY_SHORT$KEY_UNIQUE"
 
+//  KEY_UMI
+  val KEY_UMI = "umi"
   val KEY_BARCODE = "barcode"
-  val KEY_READ = "read"
   val KEY_MIN_READ = "min_read"
   val KEY_ACC_QUALITY_SCORE = s"accumulated_quality"
+
+  val KEY_FILTERED_DUPLICATES = "filtered_duplicates"
+  val KEY_FILTERED_SIMILAR = "filtered_similar"
 
   val SEQUENCE_DF_FIELDS = Array[String](
     KEY_SEQUENCE_IDENTIFIER,
@@ -40,8 +44,8 @@ trait FastQKeys {
 
   val DERIVED = Array[String](
     KEY_UNIQUE,
+    KEY_UMI,
     KEY_BARCODE,
-    KEY_READ,
     KEY_MIN_READ,
     KEY_ACC_QUALITY_SCORE
   )
