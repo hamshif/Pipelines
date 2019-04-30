@@ -211,60 +211,33 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     * @param r2
     * @return The row with higher transcription quality
     */
-  def byHigherTranscriptionQuality(r1: Row, r2: Row): Row = {
-
-
-//    val j1 = r1.getAs[String](KEY_MIN_READ)
-//    val j2 = r2.getAs[String](KEY_MIN_READ)
-//
-////    println(s"value1: ${j1} value2: ${j2}")
-
-    val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
-    val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
-
-    val r3 = score1 match {
-      case s if s >= score2 =>
-
-        r1
-      case _ =>
-        r2
-    }
-
-    val acc1 = r1.getAs[Long](KEY_FILTERED_SIMILAR)
-    val acc2 = r2.getAs[Long](KEY_FILTERED_SIMILAR)
-
-    val gg = acc1 + acc2 + 1L
-
-    val g = r3.toSeq.updated(15, gg).toArray
-//    val r = Row.fromSeq(g)
-    val rr = new GenericRowWithSchema(g, r1.schema)
-
-//    val d = rr.getAs[Long](KEY_ACC_QUALITY_SCORE)
-    //    val v = RowFactory.create(g)
-
-//    val m = r3.getValuesMap[Any](r1.schema.fieldNames) + (KEY_FILTERED_SIMILAR -> g)
-//
-//    val r = RowFactory.create(m)
-
-    rr
-  }
-
-  def gg: ((Row, Row) => Row) = {
+  def byHigherTranscriptionQuality: ((Row, Row) => Row) = {
 
     (r1, r2) => {
+
+      //    val j1 = r1.getAs[String](KEY_MIN_READ)
+      //    val j2 = r2.getAs[String](KEY_MIN_READ)
+      //
+      ////    println(s"value1: ${j1} value2: ${j2}")
+
       val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
       val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
 
-
-      val g = r1.toSeq
-
-      score1 match {
+      val r3 = score1 match {
         case s if s >= score2 =>
 
           r1
         case _ =>
           r2
       }
+
+      val acc1 = r1.getAs[Long](KEY_FILTERED_SIMILAR)
+      val acc2 = r2.getAs[Long](KEY_FILTERED_SIMILAR)
+
+      val acc = acc1 + acc2 + 1L
+      val g = r3.toSeq.updated(15, acc).toArray
+
+      new GenericRowWithSchema(g, r1.schema)
     }
   }
 
