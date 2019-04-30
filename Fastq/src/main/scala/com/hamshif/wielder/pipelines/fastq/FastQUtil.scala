@@ -235,10 +235,30 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
       val acc2 = r2.getAs[Long](KEY_FILTERED_SIMILAR)
 
       val acc = acc1 + acc2 + 1L
-      val g = r3.toSeq.updated(15, acc).toArray
 
-      new GenericRowWithSchema(g, r1.schema)
+      val r = updateRow(r3, 15, acc)
+
+      r
     }
+  }
+
+  /**
+    * Updates a row with a schema
+    * note that if the type is incorrect you will get an exception
+    *
+    * @param r a row
+    * @param i the index to update
+    * @param a the value to update
+    * @return the updated row
+    */
+  def updateRow(r: Row, i: Int, a: Any): Row = {
+
+    val s: Array[Any] = r
+      .toSeq
+      .toArray
+      .updated(i, a)
+
+    new GenericRowWithSchema(s, r.schema)
   }
 
 }

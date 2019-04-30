@@ -5,6 +5,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
+import org.apache.spark.sql.expressions.Window
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.functions.struct
 
@@ -162,6 +163,18 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     val filteredDuplicatesSchema = filteredDuplicatesDf.schema
 
+
+//    val partitionWindow = Window
+//      .partitionBy(col(KEY_MIN_READ_BARCODE))
+//      .orderBy(col(KEY_ACC_QUALITY_SCORE).desc
+//      )
+//
+//    //DF API
+//    val rankTest = rank().over(partitionWindow)
+//
+//    val df = filteredDuplicatesDf
+//      .select(col("*"), rankTest as "rank")
+
 //TODO see if this is a more promising direction for group by
 
 //    val v = filteredDuplicatesDf.columns
@@ -196,7 +209,6 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
       rdd1.take(50).foreach(it => {
 
-
         val key = it._1
         println(s"\nkey: ${key}")
 
@@ -211,7 +223,8 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     val rdd: RDD[Row] = rdd1
       .map(iterableTuple => {
-        iterableTuple._2.reduce(byHigherTranscriptionQuality)
+        iterableTuple._2
+          .reduce(byHigherTranscriptionQuality)
       })
 
     rdd1.unpersist(true)
