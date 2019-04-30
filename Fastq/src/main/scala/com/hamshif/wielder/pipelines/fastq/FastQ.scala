@@ -37,20 +37,21 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     val sparkSession = SparkSession
       .builder()
-      .appName(FastQ.getClass.getName)
+      .appName(FastQ.getClass.getName.replace("$", ""))
       .master(conf.sparkMaster)
       .getOrCreate()
 
     val sc = sparkSession.sparkContext
 
     sc.setLogLevel("ERROR")
+    sc.getConf.set("spark.debug.maxToStringFields", "100")
 
     val sqlContext = sparkSession.sqlContext
 
 
     val fs = new Path(basePath).getFileSystem(sc.hadoopConfiguration)
 
-    val byLane = getFastFilesByLane(sparkSession, basePath, fs)
+    val byLane = getFastqFilesByLane(sparkSession, basePath, fs)
 
     val sampleName = byLane.head._2._1
       .split("/").last
@@ -78,10 +79,6 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
         rawBarcodeDataCardinality = read1Df.count()
         rawSequenceTailDataCardinality = read2Df.count()
-
-        //    read1Df.printSchema()
-        //
-        //    read2Df.printSchema()
       }
 
       val joinedWithBarcode = joinFastqReadsWithFilteringExtractions(read1Df, read2Df, fastqConf.minBases)
@@ -89,11 +86,11 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       read1Df.unpersist(true)
       read2Df.unpersist(true)
 
-      val barcodeSeparatedCardinality = joinedWithBarcode.count()
-
       println(s"Joined data from\n$t1\n$t2\n")
 
       if(fastqConf.debugVerbose){
+
+        val barcodeSeparatedCardinality = joinedWithBarcode.count()
 
         println(s"$t1 size is:                  $rawBarcodeDataCardinality")
         println(s"$t2 size is:                  $rawSequenceTailDataCardinality")
@@ -132,8 +129,22 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       unitedLanesDF.show(50,false)
     }
 
+
+    val filteredFaultyRead1Df = unitedLanesDF
+      .filter(x => {
+        val v = x.getAs[String](KEY_S_SEQUENCE)
+        ! v.contains("N")
+      })
+
+    if(fastqConf.debugVerbose){
+      filteredFaultyRead1Df.show(50, false)
+    }
+
+    val filteredFaultyRead1 = filteredFaultyRead1Df.count()
+    println(s"After Filtering read1 with 'N' misreads size is: ${filteredFaultyRead1}")
+
 //    TODO consider moving this into a folding filter after the group by
-    val filteredDuplicatesDf = unitedLanesDF
+    val filteredDuplicatesDf = filteredFaultyRead1Df
       .dropDuplicates(KEY_UMI, KEY_BARCODE, KEY_SEQUENCE)
 
     val filteredDuplicates = filteredDuplicatesDf.count()
@@ -222,10 +233,12 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
     }
 
     println(s"Dataset size:                  $datasetSize")
+    println(s"After filtering read1 with N:  $filteredFaultyRead1")
     println(s"After filtering duplicates:    $filteredDuplicates")
     println(s"After filtering similar:       $filteredSimilarReads\n")
 
-    println(s"Filtered Duplicates:           ${datasetSize - filteredDuplicates}")
+    println(s"Filtered Faulty read1:         ${datasetSize - filteredFaultyRead1}")
+    println(s"Filtered Duplicates:           ${filteredFaultyRead1 - filteredDuplicates}")
     println(s"Filtered Similar:              ${filteredDuplicates - filteredSimilarReads}\n")
     println(s"Total Filtered:                ${datasetSize - filteredSimilarReads}\n")
 

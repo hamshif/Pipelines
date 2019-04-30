@@ -56,7 +56,7 @@ object FastQ1 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys w
 
     val fs = new Path(basePath).getFileSystem(sc.hadoopConfiguration)
 
-    val byLane = getFastFilesByLane(sparkSession, basePath, fs)
+    val byLane = getFastqFilesByLane(sparkSession, basePath, fs)
 
     val sampleName = byLane.head._2._1
       .split("/").last

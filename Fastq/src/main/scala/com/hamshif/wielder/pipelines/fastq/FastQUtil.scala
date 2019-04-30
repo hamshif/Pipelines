@@ -61,7 +61,7 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
   }
 
 
-  def getFastFilesByLane(sparkSession: SparkSession, basePath: String, fs: FileSystem) = {
+  def getFastqFilesByLane(sparkSession: SparkSession, basePath: String, fs: FileSystem) = {
 
     println(s"Trying to read from:\n${basePath}")
 
