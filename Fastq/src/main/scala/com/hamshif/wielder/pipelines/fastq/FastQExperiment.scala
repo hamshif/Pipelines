@@ -148,7 +148,7 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
 //    TODO consider moving this into a folding filter after the group by
     val filteredDuplicatesDf = filteredFaultyRead1Df
       .dropDuplicates(KEY_UMI, KEY_BARCODE, KEY_SEQUENCE)
-      .withColumn("id", monotonically_increasing_id)
+
 
     val filteredDuplicates = filteredDuplicatesDf.count()
 
@@ -163,13 +163,14 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
       filteredDuplicatesDf.show(false)
     }
 
-    val partitionWindow = Window
+    val similarReadWindow = Window
       .partitionBy(col(KEY_MIN_READ_BARCODE))
 
     val filteredSimilarReadsDf = filteredDuplicatesDf
-        .withColumn("maxRead", max(KEY_ACC_QUALITY_SCORE).over(partitionWindow))
-        .withColumn("count", count(KEY_ACC_QUALITY_SCORE).over(partitionWindow))
-        .withColumn("minId", min("id").over(partitionWindow))
+        .withColumn("id", monotonically_increasing_id)
+        .withColumn("maxRead", max(KEY_ACC_QUALITY_SCORE).over(similarReadWindow))
+        .withColumn("count", count(KEY_ACC_QUALITY_SCORE).over(similarReadWindow))
+        .withColumn("minId", min("id").over(similarReadWindow))
         .where(col("maxRead") === col(KEY_ACC_QUALITY_SCORE) && col("minId") === col("id") )
         .drop("maxRead")
         .drop("minId")
