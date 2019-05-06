@@ -18,6 +18,7 @@ object TestJob1 {
       .getOrCreate()
 
     val sc = sparkSession.sparkContext
+    sc.setLogLevel("ERROR")
 
     import sparkSession.sqlContext.implicits._
 
@@ -33,7 +34,7 @@ object TestJob1 {
 
     val rawSchema = rawDf.schema
 
-    val fUdf = udf(reduceByQuality, rawSchema)
+    val reduceByQualityUdf = udf(reduceByQuality, rawSchema)
 
     val aggDf = rawDf
       .groupBy("group")
@@ -42,13 +43,18 @@ object TestJob1 {
         max(col("quality")).as("quality"),
         collect_list(struct("*")).as("horizontal")
       )
-      .withColumn("short", fUdf($"horizontal"))
-      .drop("horizontal")
-
 
     aggDf.printSchema
 
     aggDf.show(false)
+
+    val vv = aggDf
+      .withColumn("short", reduceByQualityUdf($"horizontal"))
+      .drop("horizontal")
+
+    vv.printSchema
+
+    vv.show(false)
   }
 
   def reduceByQuality= (x: Any) => {

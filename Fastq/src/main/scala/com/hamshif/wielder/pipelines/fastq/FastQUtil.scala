@@ -142,8 +142,7 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
       .withColumn(KEY_MIN_READ, substring(col(KEY_SEQUENCE), 0, minBases))
       .withColumn(KEY_MIN_READ_BARCODE, concat(col(KEY_MIN_READ), lit("_"), col(KEY_S_SEQUENCE)))
       .withColumn(KEY_ACC_QUALITY_SCORE, accumulatedReadValueScoreUdf(col(KEY_QUALITY_SCORE)))
-      .withColumn(KEY_FILTERED_DUPLICATES, lit(0L))
-      .withColumn(KEY_FILTERED_SIMILAR, lit(0L))
+
   }
 
 
@@ -286,13 +285,36 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
   }
 
 
-  def byHigherTranscriptionQuality1 = (x: Any) => {
+  def arrayHead = (x: Any) => {
 
     val r = x.asInstanceOf[mutable.WrappedArray[GenericRowWithSchema]]
 
     val best = r.head
 
     best
+  }
+
+
+  def reduceByQuality= (x: Any) => {
+
+    val d = x.asInstanceOf[mutable.WrappedArray[GenericRowWithSchema]]
+
+    val red = d.reduce((r1, r2) => {
+
+      val quality1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
+      val quality2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
+
+      val r3 = quality1 match {
+        case a if a >= quality2 =>
+          r1
+        case _ =>
+          r2
+      }
+
+      r3
+    })
+
+    red
   }
 
 

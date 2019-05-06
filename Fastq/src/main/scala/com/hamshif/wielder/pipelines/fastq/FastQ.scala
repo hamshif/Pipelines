@@ -5,6 +5,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
+import org.apache.spark.sql.functions.lit
 
 /**
   * @author Gideon Bar
@@ -80,6 +81,8 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
       }
 
       val joinedWithBarcode = joinFastqReadsWithFilteringExtractions(read1Df, read2Df, fastqConf.minBases)
+        .withColumn(KEY_FILTERED_DUPLICATES, lit(0L))
+        .withColumn(KEY_FILTERED_SIMILAR, lit(0L))
 
       println(s"Joined data from\n$t1\n$t2\n")
 

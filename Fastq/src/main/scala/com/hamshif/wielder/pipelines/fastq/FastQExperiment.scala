@@ -3,9 +3,9 @@ package com.hamshif.wielder.pipelines.fastq
 import com.hamshif.wielder.wild.{DatalakeConfig, FsUtil}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
-import org.apache.spark.sql.functions.{struct, _}
+import org.apache.spark.sql.expressions.Window
+import org.apache.spark.sql.functions._
 
 /**
   * @author Gideon Bar
@@ -148,6 +148,7 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
 //    TODO consider moving this into a folding filter after the group by
     val filteredDuplicatesDf = filteredFaultyRead1Df
       .dropDuplicates(KEY_UMI, KEY_BARCODE, KEY_SEQUENCE)
+      .withColumn("id", monotonically_increasing_id)
 
     val filteredDuplicates = filteredDuplicatesDf.count()
 
@@ -162,89 +163,44 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
       filteredDuplicatesDf.show(false)
     }
 
-    val filteredDuplicatesSchema = filteredDuplicatesDf.schema
+    val partitionWindow = Window
+      .partitionBy(col(KEY_MIN_READ_BARCODE))
 
+    val filteredSimilarReadsDf = filteredDuplicatesDf
+        .withColumn("maxRead", max(KEY_ACC_QUALITY_SCORE).over(partitionWindow))
+        .withColumn("count", count(KEY_ACC_QUALITY_SCORE).over(partitionWindow))
+        .withColumn("minId", min("id").over(partitionWindow))
+        .where(col("maxRead") === col(KEY_ACC_QUALITY_SCORE) && col("minId") === col("id") )
+        .drop("maxRead")
+        .drop("minId")
+        .drop("id")
 
-//    val partitionWindow = Window
-//      .partitionBy(col(KEY_MIN_READ_BARCODE))
-//      .orderBy(col(KEY_ACC_QUALITY_SCORE).desc
-//      )
-//
-//    //DF API
-//    val rankTest = rank().over(partitionWindow)
-//
-//    val df = filteredDuplicatesDf
-//      .select(col("*"), rankTest as "rank")
+    filteredSimilarReadsDf
+      .printSchema
 
-//TODO see if this is a more promising direction for group by
+    filteredSimilarReadsDf.show(false)
 
-    val ff = udf(byHigherTranscriptionQuality1, filteredDuplicatesSchema)
-
-    val v = filteredDuplicatesDf
-      .groupBy(KEY_MIN_READ)
-      .agg(
-        count(struct("*")).as("num_reads"),
-        max(col(KEY_ACC_QUALITY_SCORE)),
-        collect_list(struct("*")).as("f")
-      )
-      .withColumn("j", ff(col("f")))
-      .drop("f")
-
-//      .select(
-//        col("f"),
-////        limitSize(1, col("f")).as("f2"),
-//        red(col("num_reads"), col("f")).as("f2"),
-//        col("num_reads")
-//      )
-//      .drop("f")
-
-
-
-    v.printSchema()
-
-    v
-      .show(false)
-
-
-    val rdd1 = filteredDuplicatesDf
-      .rdd
-      .groupBy(row => {
-        row.getAs[String](KEY_MIN_READ_BARCODE)
-      })
 
     filteredDuplicatesDf.unpersist(true)
 
     if(fastqConf.debugVerbose){
 
-      val c = rdd1.count()
+      val c = filteredSimilarReadsDf.count()
 
       println(s"number of groups $c")
 
-      rdd1.take(50).foreach(it => {
 
-        val key = it._1
-        println(s"\nkey: ${key}")
-
-        it._2.foreach(row => {
-
-          val j = row.getAs[String](KEY_MIN_READ_BARCODE)
-          println(s" value: ${j}")
-        })
-      })
     }
 
+    filteredSimilarReadsDf.take(50).foreach(r => {
 
-    val rdd: RDD[Row] = rdd1
-      .map(iterableTuple => {
-        iterableTuple._2
-          .reduce(byHigherTranscriptionQuality)
-      })
+      val key = r.getAs[String](KEY_MIN_READ_BARCODE)
+      val quality = r.getAs[Long](KEY_ACC_QUALITY_SCORE)
+      val cardinality = r.getAs[Long]("count")
 
-    rdd1.unpersist(true)
+      println(s"Combined First ${fastqConf.minBases} read1 bases with Barcode $key had $cardinality best quality $quality")
 
-    val filteredSimilarReadsDf = sqlContext.createDataFrame(rdd, filteredDuplicatesSchema)
-
-    rdd.unpersist(true)
+    })
 
     val filteredSimilarReads = filteredSimilarReadsDf.count()
 
