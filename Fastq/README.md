@@ -2,7 +2,7 @@
 local cmd args
 
 ```
---fs /Users/gbar/ --bucket ram/short --master local
+--fs /Users/gbar/ --bucket ram/short --master local --verbose false
 ```
 
 dataproc
