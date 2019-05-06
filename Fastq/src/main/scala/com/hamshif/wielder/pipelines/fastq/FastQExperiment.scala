@@ -5,6 +5,7 @@ import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
+import org.apache.spark.sql.functions.{struct, _}
 
 /**
   * @author Gideon Bar
@@ -14,14 +15,14 @@ import org.apache.spark.sql._
   * The ETL then filters for duplicates and similar read2 entries, outputting a cardinal account of the filtering stages.
   * Each filtering stage is done sequentially to preserve the filtering account disregarding potential optimizations of combining filters
   */
-object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys with Logging {
+object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with FastQKeys with Logging {
 
   def main (args: Array[String]): Unit = {
 
     val conf = getConf(args)
     val fastqConf = getSpecificConf(args)
 
-    FastQ.start(conf, fastqConf)
+    FastQExperiment.start(conf, fastqConf)
   }
 
 
@@ -144,7 +145,7 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
     val filteredFaultyRead1 = filteredFaultyRead1Df.count()
     println(s"After Filtering read1 with 'N' misreads size is: ${filteredFaultyRead1}")
 
-//    TODO consider moving this into a folding filter after the group by to minimize iterations
+//    TODO consider moving this into a folding filter after the group by
     val filteredDuplicatesDf = filteredFaultyRead1Df
       .dropDuplicates(KEY_UMI, KEY_BARCODE, KEY_SEQUENCE)
 
@@ -162,6 +163,48 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
     }
 
     val filteredDuplicatesSchema = filteredDuplicatesDf.schema
+
+
+//    val partitionWindow = Window
+//      .partitionBy(col(KEY_MIN_READ_BARCODE))
+//      .orderBy(col(KEY_ACC_QUALITY_SCORE).desc
+//      )
+//
+//    //DF API
+//    val rankTest = rank().over(partitionWindow)
+//
+//    val df = filteredDuplicatesDf
+//      .select(col("*"), rankTest as "rank")
+
+//TODO see if this is a more promising direction for group by
+
+    val ff = udf(byHigherTranscriptionQuality1, filteredDuplicatesSchema)
+
+    val v = filteredDuplicatesDf
+      .groupBy(KEY_MIN_READ)
+      .agg(
+        count(struct("*")).as("num_reads"),
+        max(col(KEY_ACC_QUALITY_SCORE)),
+        collect_list(struct("*")).as("f")
+      )
+      .withColumn("j", ff(col("f")))
+      .drop("f")
+
+//      .select(
+//        col("f"),
+////        limitSize(1, col("f")).as("f2"),
+//        red(col("num_reads"), col("f")).as("f2"),
+//        col("num_reads")
+//      )
+//      .drop("f")
+
+
+
+    v.printSchema()
+
+    v
+      .show(false)
+
 
     val rdd1 = filteredDuplicatesDf
       .rdd

@@ -9,6 +9,8 @@ import org.apache.spark.sql._
 import org.apache.spark.sql.catalyst.expressions.GenericRowWithSchema
 import org.apache.spark.sql.functions._
 
+import scala.collection.mutable
+
 /**
   * @author Gideon Bar
   *
@@ -260,5 +262,56 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
 
     new GenericRowWithSchema(s, r.schema)
   }
+
+
+  def limitSize(n: Int, arrCol: Column): Column = {
+    array( (0 until n).map( arrCol.getItem ): _* )
+  }
+
+
+  def red(n: Column, arrCol: Column): Column = {
+
+    val size = n.cast(Long.getClass.getTypeName)
+
+    val t = (0 until 2)
+      .map(i => {
+        arrCol.getItem(i)
+      })
+      .reduce((c1, c2) => {
+
+        c1
+      })
+
+    arrCol
+  }
+
+
+  def byHigherTranscriptionQuality1 = (x: Any) => {
+
+    val r = x.asInstanceOf[mutable.WrappedArray[GenericRowWithSchema]]
+
+    val best = r.head
+
+    best
+  }
+
+
+  def f: ((GenericRowWithSchema, GenericRowWithSchema) => GenericRowWithSchema) = {
+
+    (r1, r2) => {
+
+      val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
+      val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
+
+      score1 match {
+        case s if s >= score2 =>
+
+          r1
+        case _ =>
+          r2
+      }
+    }
+  }
+
 
 }
