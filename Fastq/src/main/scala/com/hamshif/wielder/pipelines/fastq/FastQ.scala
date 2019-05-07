@@ -34,9 +34,12 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     val sinkDir = s"$basePath-filtered"
 
+    val appName = this.getClass.getName.replace("$", "")
+
+
     val sparkSession = SparkSession
       .builder()
-      .appName(this.getClass.getName.replace("$", ""))
+      .appName(appName)
       .master(conf.sparkMaster)
       .getOrCreate()
 
@@ -44,6 +47,8 @@ object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys wi
 
     sc.setLogLevel("ERROR")
     sc.getConf.set("spark.debug.maxToStringFields", "100")
+
+    println(s"appName: $appName")
 
     val sqlContext = sparkSession.sqlContext
 

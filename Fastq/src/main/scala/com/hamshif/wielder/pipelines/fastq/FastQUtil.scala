@@ -243,6 +243,30 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     }
   }
 
+
+  /**
+    * Chooses the row with higher transcription quality
+    * @param r1 Dataframe row
+    * @param r2
+    * @return The row with higher transcription quality
+    */
+  def byHigherTranscriptionQuality1: ((Row, Row) => Row) = {
+
+    (r1, r2) => {
+
+      val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
+      val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
+
+      score1 match {
+        case s if s >= score2 =>
+
+          r1
+        case _ =>
+          r2
+      }
+    }
+  }
+
   /**
     * Updates a row with a schema
     * note that if the type is incorrect you will get an exception
@@ -315,24 +339,6 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
     })
 
     red
-  }
-
-
-  def f: ((GenericRowWithSchema, GenericRowWithSchema) => GenericRowWithSchema) = {
-
-    (r1, r2) => {
-
-      val score1 = r1.getAs[Long](KEY_ACC_QUALITY_SCORE)
-      val score2 = r2.getAs[Long](KEY_ACC_QUALITY_SCORE)
-
-      score1 match {
-        case s if s >= score2 =>
-
-          r1
-        case _ =>
-          r2
-      }
-    }
   }
 
 

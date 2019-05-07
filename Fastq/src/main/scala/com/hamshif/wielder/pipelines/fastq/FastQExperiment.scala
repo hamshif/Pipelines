@@ -34,9 +34,11 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
 
     val sinkDir = s"$basePath-filtered"
 
+    val appName = this.getClass.getName.replace("$", "")
+
     val sparkSession = SparkSession
       .builder()
-      .appName(this.getClass.getName.replace("$", ""))
+      .appName(appName)
       .master(conf.sparkMaster)
       .getOrCreate()
 
@@ -44,6 +46,8 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
 
     sc.setLogLevel("ERROR")
     sc.getConf.set("spark.debug.maxToStringFields", "100")
+
+    println(s"appName: $appName")
 
     val sqlContext = sparkSession.sqlContext
 
@@ -145,10 +149,8 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
     val filteredFaultyRead1 = filteredFaultyRead1Df.count()
     println(s"After Filtering read1 with 'N' misreads size is: ${filteredFaultyRead1}")
 
-//    TODO consider moving this into a folding filter after the group by
     val filteredDuplicatesDf = filteredFaultyRead1Df
       .dropDuplicates(KEY_UMI, KEY_BARCODE, KEY_SEQUENCE)
-
 
     val filteredDuplicates = filteredDuplicatesDf.count()
 
@@ -166,6 +168,8 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
     val similarReadWindow = Window
       .partitionBy(col(KEY_MIN_READ_BARCODE))
 
+//    TODO fix this to be equivalent with original
+
     val filteredSimilarReadsDf = filteredDuplicatesDf
         .withColumn("id", monotonically_increasing_id)
         .withColumn("maxRead", max(KEY_ACC_QUALITY_SCORE).over(similarReadWindow))
@@ -176,10 +180,14 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
         .drop("minId")
         .drop("id")
 
-    filteredSimilarReadsDf
-      .printSchema
 
-    filteredSimilarReadsDf.show(false)
+    if(fastqConf.debugVerbose){
+
+      filteredSimilarReadsDf
+        .printSchema
+
+      filteredSimilarReadsDf.show(false)
+    }
 
 
     filteredDuplicatesDf.unpersist(true)
