@@ -184,28 +184,22 @@ object FastQExperiment extends FastQUtil with FastqArgParser with FsUtil with Fa
 
     filteredDuplicatesDf.unpersist(true)
 
-    if(fastqConf.debugVerbose){
+    println(s"Unique together first ${fastqConf.minBases} read1 bases with barcode amount and quality map:\n")
 
-      val c = filteredSimilarReadsDf.count()
-
-      println(s"number of groups $c")
-
-
-    }
-
-    filteredSimilarReadsDf.take(50).foreach(r => {
+    filteredSimilarReadsDf
+      .foreach(r => {
 
       val key = r.getAs[String](KEY_MIN_READ_BARCODE)
       val quality = r.getAs[Long](KEY_ACC_QUALITY_SCORE)
       val cardinality = r.getAs[Long]("count")
 
-      println(s"Combined First ${fastqConf.minBases} read1 bases with Barcode $key had $cardinality best quality $quality")
+      println(s" $key had  $cardinality  similar reads.  Best quality $quality")
 
     })
 
     val filteredSimilarReads = filteredSimilarReadsDf.count()
 
-    println(s"Finished filtering similar reads and counting them.\n")
+    println(s"\nFinished filtering similar reads and counting them.\n")
 
 
     if(fastqConf.debugVerbose) {
