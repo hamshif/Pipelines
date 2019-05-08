@@ -40,7 +40,7 @@ import org.apache.spark.sql.functions._
         // Show the geometric mean of values of column "id".
         val aggDf = rawDf
           .groupBy("store", "prod")
-          .agg(maxQualityUdaf(col("amt")).as("MaxQualityFastQ"))
+          .agg(maxQualityUdaf(col("amt"), col("units")).as("MaxQualityFastQ"))
 
         aggDf.printSchema
         aggDf.show(false)
