@@ -51,4 +51,6 @@ trait FastQKeys {
   )
 
   val COMBINED = BARCODE_DF_FIELDS ++ SEQUENCE_DF_FIELDS ++ DERIVED
+
+  val KEY_ROW_WITH_MAX_QUALITY = "row_with_max_quality"
 }

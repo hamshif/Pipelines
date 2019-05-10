@@ -36,7 +36,7 @@
 
         rawDf.printSchema
         rawDf.show(false)
-        
+
         val maxAmtUdaf = new KeepRowWithMaxAmt
 
         // Keep the row with max amt
