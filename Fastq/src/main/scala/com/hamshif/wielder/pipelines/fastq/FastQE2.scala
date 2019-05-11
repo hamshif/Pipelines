@@ -33,9 +33,13 @@ object FastQE2 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys 
 
     val sinkDir = s"$basePath-filtered"
 
+    val appName = this.getClass.getName.replace("$", "")
+
+    println(s"appName : $appName")
+
     val sparkSession = SparkSession
       .builder()
-      .appName(this.getClass.getName.replace("$", ""))
+      .appName(appName)
       .master(conf.sparkMaster)
       .getOrCreate()
 
@@ -203,11 +207,13 @@ object FastQE2 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys 
 
     filteredSimilarReadsDf.printSchema
 
-    filteredSimilarReadsDf
-      .show(2000, false)
-
-
     val filteredSimilarReads = filteredSimilarReadsDf.count()
+
+    filteredSimilarReadsDf
+      .show(filteredSimilarReads.toInt, false)
+
+
+
 
     println(s"Finished filtering similar reads and counting them.\n")
 
