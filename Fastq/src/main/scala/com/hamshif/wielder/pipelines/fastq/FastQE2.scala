@@ -3,7 +3,6 @@ package com.hamshif.wielder.pipelines.fastq
 import com.hamshif.wielder.wild.{DatalakeConfig, FsUtil}
 import org.apache.hadoop.fs.Path
 import org.apache.spark.internal.Logging
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 
@@ -159,16 +158,14 @@ object FastQE2 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys 
 
       println(s"Showing filtered duplicates")
 
+      filteredDuplicatesDf.printSchema
       filteredDuplicatesDf.show(false)
     }
 
-    filteredDuplicatesDf.printSchema
-
-    filteredDuplicatesDf.show(false)
 
     val maxQualityUdaf = new KeepRowWithMaxQuality
 
-    val statsDf = filteredDuplicatesDf
+    val aggregatedDf = filteredDuplicatesDf
       .groupBy(KEY_MIN_READ, KEY_BARCODE)
       .agg(
         count(col(KEY_MIN_READ_BARCODE)),
@@ -188,44 +185,32 @@ object FastQE2 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys 
         ).as(KEY_ROW_WITH_MAX_QUALITY)
       )
 
-    statsDf.printSchema
+    if(fastqConf.debugVerbose){
 
-    statsDf.show(false)
+      println(s"Showing filtered duplicates")
 
-    val filteredDuplicatesSchema = filteredDuplicatesDf.schema
+      aggregatedDf.printSchema
 
-    val rdd: RDD[Row] = filteredDuplicatesDf
-      .rdd
-      .groupBy(row => {
-        row.getAs[String](KEY_MIN_READ_BARCODE)
-      })
-      .map(iterableTuple => {
-        iterableTuple._2
-          .reduce(byHigherTranscriptionQuality1)
-      })
+      aggregatedDf.show(false)
+    }
 
-    filteredDuplicatesDf.unpersist(true)
+    val filteredSimilarReadsDf = aggregatedDf
+      .select(s"${KEY_ROW_WITH_MAX_QUALITY}.*","*")
+      .drop(KEY_ROW_WITH_MAX_QUALITY)
 
-    val filteredSimilarReadsDf = sqlContext.createDataFrame(rdd, filteredDuplicatesSchema)
 
-    rdd.unpersist(true)
+    println(s"\nShowing filtered dataset")
+
+    filteredSimilarReadsDf.printSchema
+
+    filteredSimilarReadsDf
+      .show(2000, false)
+
 
     val filteredSimilarReads = filteredSimilarReadsDf.count()
 
     println(s"Finished filtering similar reads and counting them.\n")
 
-
-
-
-
-
-
-    if(fastqConf.debugVerbose) {
-
-      println(s"\nShowing filtered dataset")
-      filteredSimilarReadsDf
-        .show(50, false)
-    }
 
     println(s"Dataset size:                  $datasetSize")
     println(s"After filtering read1 with N:  $filteredFaultyRead1")
