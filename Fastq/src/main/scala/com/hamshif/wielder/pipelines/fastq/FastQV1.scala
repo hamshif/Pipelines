@@ -15,14 +15,14 @@ import org.apache.spark.sql.functions.lit
   * The ETL then filters for duplicates and similar read2 entries, outputting a cardinal account of the filtering stages.
   * Each filtering stage is done sequentially to preserve the filtering account disregarding potential optimizations of combining filters
   */
-object FastQ extends FastQUtil with FastqArgParser with FsUtil with FastQKeys with Logging {
+object FastQV1 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys with Logging {
 
   def main (args: Array[String]): Unit = {
 
     val conf = getConf(args)
     val fastqConf = getSpecificConf(args)
 
-    FastQ.start(conf, fastqConf)
+    FastQV1.start(conf, fastqConf)
   }
 
 
