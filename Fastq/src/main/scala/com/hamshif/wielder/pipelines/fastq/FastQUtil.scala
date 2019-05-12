@@ -208,8 +208,6 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
 
   /**
     * Chooses the row with higher transcription quality
-    * @param r1 Dataframe row
-    * @param r2
     * @return The row with higher transcription quality
     */
   def byHigherTranscriptionQuality: ((Row, Row) => Row) = {
@@ -246,8 +244,6 @@ class FastQUtil extends FsUtil with FastQKeys with Logging {
 
   /**
     * Chooses the row with higher transcription quality
-    * @param r1 Dataframe row
-    * @param r2
     * @return The row with higher transcription quality
     */
   def byHigherTranscriptionQuality1: ((Row, Row) => Row) = {

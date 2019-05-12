@@ -76,8 +76,8 @@ import org.apache.spark.sql.types._
         val amt = buffer.getAs[Long](8)
         val candidateAmt = input.getAs[Long](8)
 
-        amt match {
-          case a if a < candidateAmt =>
+        if(amt < candidateAmt) {
+
             buffer(0) = input.getAs[String](0)
             buffer(1) = input.getAs[String](1)
             buffer(2) = input.getAs[String](2)
@@ -87,7 +87,7 @@ import org.apache.spark.sql.types._
             buffer(6) = input.getAs[String](6)
             buffer(7) = input.getAs[String](7)
             buffer(8) = input.getAs[Long](8)
-          case _ =>
+
         }
       }
 

@@ -170,7 +170,7 @@ object FastQE2 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys 
     val maxQualityUdaf = new KeepRowWithMaxQuality
 
     val aggregatedDf = filteredDuplicatesDf
-      .groupBy(KEY_MIN_READ, KEY_BARCODE)
+      .groupBy(KEY_MIN_READ_BARCODE)
       .agg(
         count(col(KEY_MIN_READ_BARCODE)),
         max(col(KEY_ACC_QUALITY_SCORE)),
@@ -209,10 +209,10 @@ object FastQE2 extends FastQUtil with FastqArgParser with FsUtil with FastQKeys 
 
     val filteredSimilarReads = filteredSimilarReadsDf.count()
 
+
     filteredSimilarReadsDf
-      .show(filteredSimilarReads.toInt, false)
-
-
+//      .filter(col("count(min_read_barcode)") > 1)
+      .show(2000, false)
 
 
     println(s"Finished filtering similar reads and counting them.\n")
