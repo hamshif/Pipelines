@@ -19,6 +19,7 @@ object TestJob4 {
       .getOrCreate()
 
     val sc = sparkSession.sparkContext
+    sc.setLogLevel("ERROR")
 
     import sparkSession.sqlContext.implicits._
 
