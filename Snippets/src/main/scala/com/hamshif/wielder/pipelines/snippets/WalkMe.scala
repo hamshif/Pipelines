@@ -3,8 +3,14 @@ package com.hamshif.wielder.pipelines.snippets
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 
+trait Keys {
+  val KEY_TIMESTAMP = "timestamp"
+  val KEY_ACTION = "action"
+  val KEY_EMAIL = "email"
+  val KEY_IP = "ip"
+}
 
-object WalkMe {
+object WalkMe extends Keys {
 
   def main (args: Array[String]): Unit = {
 
@@ -13,7 +19,10 @@ object WalkMe {
     val viewsDir = s"${rootDir}views"
     val clicksDir = s"${rootDir}clicks"
 
-    val sincDir = s"$rootDir/backup"
+    val sinkDir = s"$rootDir/backup"
+
+    val standardColumnNames: Array[String] = Array(KEY_TIMESTAMP, KEY_ACTION, KEY_EMAIL, KEY_IP)
+
 
     val sparkSession = SparkSession
       .builder()
@@ -23,25 +32,11 @@ object WalkMe {
 
     val sc = sparkSession.sparkContext
     sc.setLogLevel("ERROR")
-//
+
     import sparkSession.sqlContext.implicits._
 
+
     val salt = "melach_yam"
-
-
-    val clicksDf = sparkSession.read
-      .option("header", "true")
-      .option("delimiter", ",")
-      .option("inferSchema", "true")
-      .format("csv")
-      .load(clicksDir)
-      .withColumnRenamed("ts", "timestamp")
-      .withColumn("action", concat(lit("click-"), $"element"))
-
-    clicksDf.printSchema
-
-    println("showing clicksDf")
-    clicksDf.show(false)
 
     val viewsDf = sparkSession.read
       .option("header", "true")
@@ -49,56 +44,65 @@ object WalkMe {
       .option("inferSchema", "true")
       .format("csv")
       .load(viewsDir)
-      .withColumn("action", lit("view"))
+      .withColumn(KEY_ACTION, lit("view"))
+      .select(standardColumnNames.head, standardColumnNames.tail: _*)
 
-
-    viewsDf.printSchema
     println("showing viewsDf")
+    viewsDf.printSchema
     viewsDf.show(false)
+    println("\n\n")
 
-    val joinedClicks = joinReads(clicksDf, viewsDf.drop("timestamp"))
+    val clicksDf = sparkSession.read
+      .option("header", "true")
+      .option("delimiter", ",")
+      .option("inferSchema", "true")
+      .format("csv")
+      .load(clicksDir)
+      .withColumnRenamed("ts", KEY_TIMESTAMP)
+      .withColumn(KEY_ACTION, concat(lit("click-"), $"element"))
+      .drop("element")
 
-    println("showing joinedClicks")
-    joinedClicks
-      .show(false)
+    val enrichedClicks = clicksDf.as("clicksDf")
+      .join(viewsDf.as("viewsDf"), clicksDf(KEY_EMAIL) === viewsDf(KEY_EMAIL))
+      .select("clicksDf.timestamp", "clicksDf.action", "clicksDf.email", "viewsDf.ip")
 
-
-     val joinedViews = joinReads(viewsDf, clicksDf.drop("timestamp"))
-
-
-    println("showing joinedViews")
-    joinedViews.show(false)
-
-
-    val hashedViewsDf = hashDf(joinedViews, sparkSession, salt)
-
-    println("showing hashedViewsDf")
-    hashedViewsDf.show(false)
-
-
-    val hashedViewsDfTodo = hashedViewsDf
-      .drop("action")
-
-//    TODO solve duplicate column problem
-    toCSV(hashedViewsDfTodo, destination = s"$sincDir/views")
+    println("showing clicksDf")
+    clicksDf.printSchema
+    clicksDf.show(false)
+    println("\n\n")
 
 
-    val hashedClicksDf = hashDf(joinedViews, sparkSession, salt)
-      .filter($"element".isNotNull)
+    println("showing enrichedClicks")
+    enrichedClicks.printSchema
+    enrichedClicks.show(false)
+    println("\n\n")
 
-    println("showing hashedClicksDf")
-    hashedClicksDf.show(false)
+
+    val unitedDF = viewsDf.union(enrichedClicks)
+      .orderBy(asc(KEY_TIMESTAMP))
 
 
-    val hashedClicksDfTodo = hashedClicksDf
-      .drop("action")
+    println("showing unitedDF")
+    unitedDF.printSchema
+    unitedDF.show(false)
+    println("\n\n")
 
-//    TODO solve duplicate column problem
-    toCSV(hashedClicksDfTodo, destination = s"$sincDir/clicks")
+    val maskedDf = maskDf(unitedDF, sparkSession, salt)
 
-  println("break")
+    println("showing maskedDf")
+    maskedDf.printSchema
+    maskedDf.show(false)
+    println("\n\n")
 
+    writeCSV(maskedDf
+      .select("*")
+      .where($"timestamp" < 1533081800), s"$sinkDir/first")
+
+    writeCSV(maskedDf
+      .select("*")
+      .where($"timestamp" >= 1533081800), s"$sinkDir/second")
   }
+
 
   val maskedIpUdf = udf(maskIp)
 
@@ -115,36 +119,38 @@ object WalkMe {
     d + ".0"
   }
 
+
   def joinReads(read1Df: DataFrame, read2Df: DataFrame): DataFrame  = {
 
     read1Df
-      .join(read2Df, Seq("email"),"outer")
+      .join(read2Df, Seq(KEY_EMAIL),"outer")
   }
 
 
-  def hashDf(inDf: DataFrame, sparkSession: SparkSession, salt: String) = {
+  def maskDf(inDf: DataFrame, sparkSession: SparkSession, salt: String) = {
 
     import sparkSession.sqlContext.implicits._
 
     val maskedDf = inDf
-      .orderBy(asc("timestamp"))
+
       .withColumn("salted", concat($"email", lit(salt)))
       .withColumn("hashed_email", md5($"salted"))
-      .drop("email", "salted")
+      .drop(KEY_EMAIL, "salted")
       .withColumn("masked_ip", maskedIpUdf($"ip"))
-      .drop("ip")
+      .drop(KEY_IP)
 
     maskedDf
   }
 
 
-  def toCSV(inDf: DataFrame, destination: String) = {
+  def writeCSV(inDf: DataFrame, destination: String) = {
 
     inDf
       .repartition(1)
       .write.format("com.databricks.spark.csv")
+      .mode(SaveMode.Overwrite)
       .option("header", "true")
-      .save(s"$destination.csv")
+      .save(destination)
   }
 
 }
