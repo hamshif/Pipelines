@@ -3,14 +3,8 @@ package com.hamshif.wielder.pipelines.snippets
 import org.apache.spark.sql._
 import org.apache.spark.sql.functions._
 
-trait Keys {
-  val KEY_TIMESTAMP = "timestamp"
-  val KEY_ACTION = "action"
-  val KEY_EMAIL = "email"
-  val KEY_IP = "ip"
-}
 
-object WalkMe extends Keys {
+object WalkMe extends CommonKeys {
 
   def main (args: Array[String]): Unit = {
 
@@ -45,12 +39,10 @@ object WalkMe extends Keys {
       .format("csv")
       .load(viewsDir)
       .withColumn(KEY_ACTION, lit("view"))
+      .withColumn(KEY_TIMESTAMP, toLongUdf($"timestamp"))
       .select(standardColumnNames.head, standardColumnNames.tail: _*)
 
-    println("showing viewsDf")
-    viewsDf.printSchema
-    viewsDf.show(false)
-    println("\n\n")
+    showDf(viewsDf, "viewsDf")
 
     val clicksDf = sparkSession.read
       .option("header", "true")
@@ -59,50 +51,43 @@ object WalkMe extends Keys {
       .format("csv")
       .load(clicksDir)
       .withColumnRenamed("ts", KEY_TIMESTAMP)
+      .withColumn(KEY_TIMESTAMP, toLongUdf($"timestamp"))
       .withColumn(KEY_ACTION, concat(lit("click-"), $"element"))
       .drop("element")
+
+    showDf(clicksDf, "clicksDf")
 
     val enrichedClicks = clicksDf.as("clicksDf")
       .join(viewsDf.as("viewsDf"), clicksDf(KEY_EMAIL) === viewsDf(KEY_EMAIL))
       .select("clicksDf.timestamp", "clicksDf.action", "clicksDf.email", "viewsDf.ip")
 
-    println("showing clicksDf")
-    clicksDf.printSchema
-    clicksDf.show(false)
-    println("\n\n")
-
-
-    println("showing enrichedClicks")
-    enrichedClicks.printSchema
-    enrichedClicks.show(false)
-    println("\n\n")
-
+    showDf(enrichedClicks, "enrichedClicks")
 
     val unitedDF = viewsDf.union(enrichedClicks)
+      .withColumn(KEY_INTERVAL, closest200IntervalUdf(col(KEY_TIMESTAMP)))
       .orderBy(asc(KEY_TIMESTAMP))
 
-
-    println("showing unitedDF")
-    unitedDF.printSchema
-    unitedDF.show(false)
-    println("\n\n")
+    showDf(unitedDF, "unitedDF")
 
     val maskedDf = maskDf(unitedDF, sparkSession, salt)
 
-    println("showing maskedDf")
-    maskedDf.printSchema
-    maskedDf.show(false)
-    println("\n\n")
+    showDf(maskedDf, "maskedDf")
 
-    writeCSV(maskedDf
-      .select("*")
-      .where($"timestamp" < 1533081800), s"$sinkDir/first")
-
-    writeCSV(maskedDf
-      .select("*")
-      .where($"timestamp" >= 1533081800), s"$sinkDir/second")
+    maskedDf
+      .repartition(col(KEY_INTERVAL))
+      .write.format("com.databricks.spark.csv")
+      .partitionBy(KEY_INTERVAL)
+      .mode(SaveMode.Overwrite)
+      .option("header", "true")
+      .save(sinkDir)
   }
 
+  val toLongUdf = udf(flam)
+
+  def flam = (i: Int) => {
+
+    i.toLong
+  }
 
   val maskedIpUdf = udf(maskIp)
 
@@ -143,14 +128,23 @@ object WalkMe extends Keys {
   }
 
 
-  def writeCSV(inDf: DataFrame, destination: String) = {
+  def showDf(df: DataFrame, name: String) = {
 
-    inDf
-      .repartition(1)
-      .write.format("com.databricks.spark.csv")
-      .mode(SaveMode.Overwrite)
-      .option("header", "true")
-      .save(destination)
+    println(s"showing $df")
+    df.printSchema
+    df.show(false)
+    println("\n\n")
+  }
+
+  val closest200IntervalUdf = udf(closest200Interval)
+
+  def closest200Interval = (n: Long) => {
+
+    val a = n / 100
+
+    if(a % 2 != 0)
+      a - 1
+    else a
   }
 
 }
