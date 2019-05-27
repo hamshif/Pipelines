@@ -10,8 +10,8 @@ object WalkMe extends CommonKeys {
 
     val rootDir = args(0)
 
-    val viewsDir = s"${rootDir}views"
-    val clicksDir = s"${rootDir}clicks"
+    val viewsDir = s"${rootDir}/views"
+    val clicksDir = s"${rootDir}/clicks"
 
     val sinkDir = s"$rootDir/backup"
 
