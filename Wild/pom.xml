@@ -6,12 +6,12 @@
 
     <parent>
         <groupId>com.hamshif.pipelines</groupId>
-        <artifactId>pipelines</artifactId>
+        <artifactId>Pipelines</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
     <groupId>com.hamshif.wielder</groupId>
-    <artifactId>wild</artifactId>
+    <artifactId>Wild</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 
     <properties>

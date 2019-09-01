@@ -23,7 +23,7 @@
 
         <dependency>
             <groupId>com.hamshif.wielder</groupId>
-            <artifactId>wild</artifactId>
+            <artifactId>Wild</artifactId>
             <version>1.0.0-SNAPSHOT</version>
         </dependency>
 
