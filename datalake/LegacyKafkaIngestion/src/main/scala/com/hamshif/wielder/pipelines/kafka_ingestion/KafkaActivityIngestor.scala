@@ -97,7 +97,6 @@ object KafkaActivityIngestor extends LegacyKafkaArgParser with CommonDictionary 
       .set("zookeeper.hosts", zkArgs)
 
       .set("envName", env.toString.toUpperCase)
-      .set("platforminsight.schema.registry.url", s"http://$env-schemareg-ws.marketo.org")
       .set("serviceName", serviceId)
       .set("dcName", "SJ")
       .set("rml.enabled", "false")
@@ -107,7 +106,6 @@ object KafkaActivityIngestor extends LegacyKafkaArgParser with CommonDictionary 
       .set("multitenant.ratecontroller", "PendingBatchRateController")
       .set("spark.streaming.batchSize", "5")
       .set("multitenant.ratecontroller.pendingbatchcontroller.maxPendingBatches", "0")
-      .set("rml.tsdb.url", s"http://sj$env-tsdb-vip.marketo.org")
       .set("clusterName", clusterName)
       .set("streaming.application", comp)
 

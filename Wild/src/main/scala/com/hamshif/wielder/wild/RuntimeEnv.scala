@@ -10,5 +10,5 @@ object RuntimeEnv extends Enumeration {
 
   val Local = Value("local")
   val Dataproc = Value("dataproc")
-  val MarketoOnPrem = Value("marketo")
+  val OnPrem = Value("onprem")
 }

@@ -50,12 +50,12 @@ trait DatalakeArgParser {
         x match {
           case "dataproc" => RuntimeEnv.Dataproc
           case "local" => RuntimeEnv.Local
-          case "marketo" => RuntimeEnv.MarketoOnPrem
+          case "onprem" => RuntimeEnv.OnPrem
           case _ => RuntimeEnv.Dataproc
         }
 
       }))
-      .text("renv is an enumeration of runtime environments e.g. Dataproc, Local, Marketo On Premises")
+      .text("renv is an enumeration of runtime environments e.g. Dataproc, Local, On Premises")
 
     opt[String]('f', "fs")
       .action((x, c) => c.copy(fsPrefix = x))
